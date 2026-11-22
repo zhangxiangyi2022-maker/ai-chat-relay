@@ -1,0 +1,17 @@
+name: Request New Platform Adapter / 申请适配新平台
+description: Suggest adding support for another AI web app (e.g. Grok, Kimi, Perplexity, Qwen)
+title: "[Platform]: "
+labels: ["enhancement"]
+body:
+  - type: input
+    id: site_url
+    attributes:
+      label: Platform Name & URL / 平台名称与网址
+      placeholder: e.g. Grok (https://grok.com/)
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Why this platform? / 补充说明
+      description: Any specific features needed (thinking blocks, code blocks, slash prompt trigger)?

@@ -1,0 +1,32 @@
+name: Bug Report / 问题反馈
+description: Report a broken selector, input issue, or export bug on ChatGPT, Gemini, Claude, or DeepSeek
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Target Platform / 目标平台
+      options:
+        - ChatGPT (chatgpt.com)
+        - Gemini (gemini.google.com)
+        - Claude (claude.ai)
+        - DeepSeek (chat.deepseek.com)
+    validations:
+      required: true
+  - type: dropdown
+    id: build_type
+    attributes:
+      label: Build Type / 安装方式
+      options:
+        - Chrome / Edge Extension
+        - Tampermonkey / Violentmonkey Userscript
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened? / 问题描述
+      description: Describe what broke (e.g. Handoff button did not detect messages, or / prompt did not insert).
+    validations:
+      required: true

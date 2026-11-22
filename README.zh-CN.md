@@ -1,8 +1,19 @@
 # ChatRelay — 跨平台 AI 提示词与对话接力助手
 
-[English README](./README.md)
+[![Release](https://img.shields.io/github/v/release/zhangxiangyi2022-maker/ai-chat-relay?style=flat-square)](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/zhangxiangyi2022-maker/ai-chat-relay/ci.yml?style=flat-square&label=CI)](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE)
+[![Privacy: 100% Local](https://img.shields.io/badge/Privacy-%E7%BA%AF%E6%9C%AC%E5%9C%B0%E9%9B%B6%E8%81%94%E7%BD%91%E8%84%B1%E6%95%8F-16a34a?style=flat-square)](./PRIVACY.md)
+
+[English README](./README.md) · [隐私保护声明](./PRIVACY.md) · [申请适配新平台](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/issues/new?template=platform_request.yml)
 
 面向 **ChatGPT、Gemini、Claude、DeepSeek** 的轻量开源浏览器增强工具，一套 TypeScript 代码**一键双构建**出 **Chrome/Edge 扩展（MV3）** 与 **油猴脚本（`.user.js`）**。
+
+## 界面预览
+
+| 跨平台一键接力（自动脱敏） | `/` 快捷指令与模板面板 | 隐私开关与一键清缓存 |
+| :---: | :---: | :---: |
+| ![跨平台接力效果](./docs/preview-handoff.png) | ![快捷指令面板](./docs/preview-palette.png) | ![隐私设置面板](./docs/preview-privacy.png) |
 
 ## 核心功能
 
@@ -28,6 +39,8 @@
 - **Gemini**：`https://gemini.google.com/`
 - **Claude**：`https://claude.ai/`
 - **DeepSeek**：`https://chat.deepseek.com/`
+
+需要适配 Grok、Kimi、Perplexity、通义千问等其他平台？欢迎直接[提 Issue 申请适配](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/issues/new?template=platform_request.yml)。
 
 ## 安装使用
 

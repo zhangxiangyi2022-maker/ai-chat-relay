@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Privacy Policy / 隐私保护声明
+    url: https://github.com/zhangxiangyi2022-maker/ai-chat-relay/blob/main/PRIVACY.md
+    about: Details on local-only processing, secret redaction, and burn-after-read handoff.

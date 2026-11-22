@@ -1,8 +1,19 @@
 # ChatRelay
 
-[中文文档](./README.zh-CN.md)
+[![Release](https://img.shields.io/github/v/release/zhangxiangyi2022-maker/ai-chat-relay?style=flat-square)](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/zhangxiangyi2022-maker/ai-chat-relay/ci.yml?style=flat-square&label=CI)](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE)
+[![Privacy: 100% Local](https://img.shields.io/badge/Privacy-100%25%20Local%20%26%20Auto--Redact-16a34a?style=flat-square)](./PRIVACY.md)
+
+[中文文档](./README.zh-CN.md) · [Privacy Policy](./PRIVACY.md) · [Request New AI Platform](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/issues/new?template=platform_request.yml)
 
 **Cross-AI Prompt Palette, Context Handoff, and Clean Markdown Exporter** for **ChatGPT, Gemini, Claude, and DeepSeek** — built from a single TypeScript codebase into both a **Chrome/Edge Extension (MV3)** and a **Tampermonkey/Violentmonkey Userscript**.
+
+## Preview
+
+| Cross-Platform Context Handoff | `/` Prompt & Playbook Palette | Built-in Privacy & Auto-Redaction |
+| :---: | :---: | :---: |
+| ![Cross-Platform Context Handoff](./docs/preview-handoff.png) | ![Slash Prompt Palette](./docs/preview-palette.png) | ![Privacy Settings](./docs/preview-privacy.png) |
 
 ## Features
 
@@ -28,6 +39,8 @@
 - **Gemini**: `https://gemini.google.com/`
 - **Claude**: `https://claude.ai/`
 - **DeepSeek**: `https://chat.deepseek.com/`
+
+Want another platform (Grok, Kimi, Perplexity, Qwen)? [Open a Platform Request](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/issues/new?template=platform_request.yml).
 
 ## Installation
 
@@ -62,7 +75,7 @@ Dual build outputs:
 ```text
 src/
 ├── adapters/   # ChatGPT, Gemini, Claude, DeepSeek DOM extractors & input injectors
-├── core/       # DOM-to-Markdown, templates engine, handoff packager, MD exporter
+├── core/       # DOM-to-Markdown, privacy redaction, templates engine, handoff, exporter
 ├── storage/    # Shared StorageBridge (GM_* APIs / chrome.storage.local / Memory)
 ├── ui/         # Trusted-Types-safe Shadow DOM dock, palette modal, handoff capsule
 └── entries/    # Dual-build entry points (extension.ts, popup.ts, userscript.ts)

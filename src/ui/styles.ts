@@ -152,12 +152,12 @@ export const SHADOW_CSS = `
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: min(11vh, 88px);
+  padding-top: min(7vh, 56px);
 }
 
 .cr-modal {
   width: min(640px, 92vw);
-  max-height: 76vh;
+  max-height: 84vh;
   background: var(--cr-bg-solid);
   color: var(--cr-text);
   border: 1px solid var(--cr-border);
@@ -290,11 +290,11 @@ export const SHADOW_CSS = `
 }
 
 .cr-form {
-  padding: 14px 16px;
+  padding: 12px 16px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .cr-field {
@@ -350,9 +350,10 @@ export const SHADOW_CSS = `
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border: 1px solid var(--cr-border);
   border-radius: 10px;
+  font-size: 12.5px;
 }
 
 .cr-radio-group {
