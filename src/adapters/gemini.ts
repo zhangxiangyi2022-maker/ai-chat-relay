@@ -1,11 +1,14 @@
-import { domElementToMarkdown } from '../core/domToMarkdown.js';
-import type { ChatMessage } from '../types/index.js';
+import type { ChatMessage, ExtractedMessageNode } from '../types/index.js';
 import {
+  buildMessageNode,
   cleanDocumentTitle,
+  clickSubmitControl,
+  hasVisibleMatch,
   insertIntoInputElement,
   isElementVisible,
   queryFirst,
   readInputText,
+  toPlainMessages,
 } from './shared.js';
 import type { SiteAdapter } from './types.js';
 
@@ -15,6 +18,22 @@ const INPUT_SELECTORS = [
   'rich-textarea [contenteditable="true"]',
   'textarea[aria-label*="Gemini" i]',
   '[contenteditable="true"][role="textbox"]',
+];
+
+const SUBMIT_SELECTORS = [
+  'button.send-button',
+  'button[aria-label*="Send message" i]',
+  'button[aria-label*="Send" i]',
+  'button[aria-label*="发送" i]',
+];
+
+const STOP_SELECTORS = [
+  'button[aria-label*="Stop response" i]',
+  'button[aria-label*="Stop generating" i]',
+  'button[aria-label*="停止" i]',
+  'mat-spinner',
+  '.loading-content-spinner',
+  'model-response [aria-busy="true"]',
 ];
 
 export const geminiAdapter: SiteAdapter = {
@@ -39,10 +58,20 @@ export const geminiAdapter: SiteAdapter = {
     return insertIntoInputElement(input, text, options);
   },
 
-  extractMessages(): ChatMessage[] {
-    const results: ChatMessage[] = [];
+  clickSubmit(): boolean {
+    return clickSubmitControl(SUBMIT_SELECTORS, this.findInput());
+  },
+
+  isGenerating(): boolean {
+    return hasVisibleMatch(STOP_SELECTORS);
+  },
+
+  extractMessageNodes(): ExtractedMessageNode[] {
+    const results: ExtractedMessageNode[] = [];
     const blocks = Array.from(
-      document.querySelectorAll<HTMLElement>('user-query, model-response, [data-test-id="user-query"], [data-test-id="model-response"]')
+      document.querySelectorAll<HTMLElement>(
+        'user-query, model-response, [data-test-id="user-query"], [data-test-id="model-response"]'
+      )
     );
 
     if (blocks.length > 0) {
@@ -50,32 +79,40 @@ export const geminiAdapter: SiteAdapter = {
         const tag = block.tagName.toLowerCase();
         const isUser = tag === 'user-query' || block.getAttribute('data-test-id') === 'user-query';
         const contentRoot = isUser
-          ? block.querySelector<HTMLElement>('.query-text, .user-query-bubble-with-background, user-query-content') ?? block
+          ? block.querySelector<HTMLElement>('.query-text, .user-query-bubble-with-background, user-query-content') ??
+            block
           : block.querySelector<HTMLElement>('message-content, .model-response-text, .markdown') ?? block;
         const thinkingNode = !isUser ? block.querySelector<HTMLElement>('.thoughts-content, model-thoughts') : null;
-        const content = domElementToMarkdown(contentRoot);
-        if (!content) continue;
-        const thinking = thinkingNode ? domElementToMarkdown(thinkingNode) : '';
-        results.push(thinking ? { role: isUser ? 'user' : 'assistant', content, thinking } : { role: isUser ? 'user' : 'assistant', content });
+        const built = buildMessageNode(
+          results.length,
+          isUser ? 'user' : 'assistant',
+          contentRoot,
+          block,
+          thinkingNode
+        );
+        if (built) results.push(built);
       }
       return results;
     }
 
-    // Fallback: conversation container pairs
     const containers = Array.from(document.querySelectorAll<HTMLElement>('.conversation-container'));
     for (const box of containers) {
       const u = box.querySelector<HTMLElement>('.query-text, user-query-content');
       if (u) {
-        const md = domElementToMarkdown(u);
-        if (md) results.push({ role: 'user', content: md });
+        const builtU = buildMessageNode(results.length, 'user', u, u);
+        if (builtU) results.push(builtU);
       }
       const m = box.querySelector<HTMLElement>('message-content, .markdown');
       if (m) {
-        const md = domElementToMarkdown(m);
-        if (md) results.push({ role: 'assistant', content: md });
+        const builtM = buildMessageNode(results.length, 'assistant', m, m);
+        if (builtM) results.push(builtM);
       }
     }
     return results;
+  },
+
+  extractMessages(): ChatMessage[] {
+    return toPlainMessages(this.extractMessageNodes());
   },
 
   getConversationTitle(): string {

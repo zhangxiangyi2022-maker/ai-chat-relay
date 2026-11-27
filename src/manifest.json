@@ -1,10 +1,18 @@
 {
   "manifest_version": 3,
-  "name": "ChatRelay — Cross-AI Prompt & Context Handoff",
-  "version": "0.1.1",
+  "name": "ChatRelay — Cross-AI Cockpit, Timeline & Reality Check",
+  "version": "1.0.0",
   "homepage_url": "https://github.com/zhangxiangyi2022-maker/ai-chat-relay",
-  "description": "Slash prompt templates, seamless cross-platform context handoff, and clean Markdown export for ChatGPT, Gemini, Claude, and DeepSeek.",
+  "description": "Metro timeline & fork, multi-tab Dynamic Island radar & broadcast, Pinboard, anti-hallucination package/repo verifier, and privacy-first handoff for ChatGPT, Gemini, Claude, and DeepSeek.",
   "permissions": ["storage"],
+  "host_permissions": [
+    "https://registry.npmjs.org/*",
+    "https://pypi.org/*",
+    "https://api.github.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

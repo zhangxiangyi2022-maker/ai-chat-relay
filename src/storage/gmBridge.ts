@@ -1,4 +1,5 @@
-import type { StorageBridge, StorageKey } from '../types/index.js';
+import { isAllowedVerifyUrl } from '../core/verifier.js';
+import type { HttpGetResponse, StorageBridge, StorageKey } from '../types/index.js';
 import { copyWithFallback, STORAGE_PREFIX, storageFullKey } from './bridge.js';
 
 declare function GM_getValue<T>(name: string, defaultValue?: T): T | Promise<T>;
@@ -10,8 +11,24 @@ declare function GM_addValueChangeListener(
 ): string | number;
 declare function GM_removeValueChangeListener(listenerId: string | number): void;
 declare function GM_setClipboard(data: string, info?: string): void;
+declare function GM_xmlhttpRequest(details: {
+  method: 'GET';
+  url: string;
+  headers?: Record<string, string>;
+  timeout?: number;
+  onload?: (resp: { status: number; responseText: string }) => void;
+  onerror?: () => void;
+  ontimeout?: () => void;
+}): void;
 
-const ALL_KEYS: StorageKey[] = ['templates', 'handoff', 'settings'];
+const ALL_KEYS: StorageKey[] = [
+  'templates',
+  'handoff',
+  'settings',
+  'pins',
+  'tab_statuses',
+  'broadcast',
+];
 
 export class GmStorageBridge implements StorageBridge {
   async get<T>(key: StorageKey): Promise<T | null> {
@@ -71,5 +88,32 @@ export class GmStorageBridge implements StorageBridge {
       // Fall back to navigator/DOM copy
     }
     return copyWithFallback(text);
+  }
+
+  async fetchPublicReadOnly(url: string): Promise<HttpGetResponse> {
+    if (!isAllowedVerifyUrl(url)) {
+      return { ok: false, status: 403, body: 'Blocked non-allowlisted domain' };
+    }
+    if (typeof GM_xmlhttpRequest === 'function') {
+      return new Promise<HttpGetResponse>((resolve) => {
+        GM_xmlhttpRequest({
+          method: 'GET',
+          url,
+          headers: { Accept: 'application/json' },
+          timeout: 6500,
+          onload: (resp) => {
+            resolve({
+              ok: resp.status >= 200 && resp.status < 300,
+              status: resp.status,
+              body: resp.responseText ?? '',
+            });
+          },
+          onerror: () => resolve({ ok: false, status: 0, body: 'Network error' }),
+          ontimeout: () => resolve({ ok: false, status: 0, body: 'Request timeout' }),
+        });
+      });
+    }
+    const resp = await fetch(url, { headers: { Accept: 'application/json' } });
+    return { ok: resp.ok, status: resp.status, body: await resp.text() };
   }
 }

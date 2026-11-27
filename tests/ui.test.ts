@@ -36,8 +36,8 @@ describe('ChatRelay UI & cross-platform handoff integration', () => {
     const host = document.getElementById('chat-relay-root');
     expect(host?.shadowRoot).not.toBeNull();
 
-    const buttons = Array.from(host!.shadowRoot!.querySelectorAll('button'));
-    const handoffBtn = buttons.find((b) => b.textContent?.includes('带走接力'));
+    const buttons = Array.from(host!.shadowRoot!.querySelectorAll<HTMLButtonElement>('.cr-dock button'));
+    const handoffBtn = buttons.find((b) => b.textContent?.includes('接力'));
     expect(handoffBtn).toBeDefined();
 
     handoffBtn!.click();

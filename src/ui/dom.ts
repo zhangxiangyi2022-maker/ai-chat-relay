@@ -9,7 +9,14 @@ export type IconName =
   | 'trash'
   | 'copy'
   | 'upload'
-  | 'sparkles';
+  | 'sparkles'
+  | 'pin'
+  | 'shield'
+  | 'radar'
+  | 'fork'
+  | 'send'
+  | 'bell'
+  | 'mute';
 
 type ChildInput = Node | string | null | undefined | false;
 
@@ -31,6 +38,8 @@ export interface ElProps {
   disabled?: boolean;
   dataset?: Record<string, string>;
   onClick?: (e: MouseEvent) => void;
+  onMouseEnter?: (e: MouseEvent) => void;
+  onMouseLeave?: (e: MouseEvent) => void;
   onInput?: (e: Event) => void;
   onChange?: (e: Event) => void;
   onKeyDown?: (e: KeyboardEvent) => void;
@@ -75,6 +84,8 @@ export function el<K extends keyof HTMLElementTagNameMap>(
     }
     const htmlNode = node as HTMLElement;
     if (props.onClick) htmlNode.addEventListener('click', props.onClick);
+    if (props.onMouseEnter) htmlNode.addEventListener('mouseenter', props.onMouseEnter);
+    if (props.onMouseLeave) htmlNode.addEventListener('mouseleave', props.onMouseLeave);
     if (props.onInput) htmlNode.addEventListener('input', props.onInput);
     if (props.onChange) htmlNode.addEventListener('change', props.onChange);
     if (props.onKeyDown) htmlNode.addEventListener('keydown', props.onKeyDown);
@@ -114,6 +125,13 @@ const ICON_PATHS: Record<IconName, string[]> = {
   copy: ['M9 9h13v13H9z', 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'],
   upload: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M17 8l-5-5-5 5', 'M12 3v12'],
   sparkles: ['M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z', 'M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8L19 16z'],
+  pin: ['M12 17v5', 'M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z'],
+  shield: ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'M9 12l2 2 4-4'],
+  radar: ['M12 2a10 10 0 1 0 10 10', 'M12 12l6-6', 'M12 6a6 6 0 1 0 6 6'],
+  fork: ['M6 3v12', 'M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z', 'M18 9a9 9 0 0 1-9 9'],
+  send: ['M22 2L11 13', 'M22 2l-7 20-4-9-9-4 20-7z'],
+  bell: ['M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 0 1-3.46 0'],
+  mute: ['M11 5L6 9H2v6h4l5 4V5z', 'M23 9l-6 6', 'M17 9l6 6'],
 };
 
 export function svgIcon(name: IconName, size = 15): SVGSVGElement {

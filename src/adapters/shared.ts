@@ -1,5 +1,5 @@
 import { domElementToMarkdown } from '../core/domToMarkdown.js';
-import type { ChatMessage, MessageRole } from '../types/index.js';
+import type { ChatMessage, ExtractedMessageNode, MessageRole } from '../types/index.js';
 
 export function queryFirst(selectors: readonly string[], root: ParentNode = document): HTMLElement | null {
   for (const sel of selectors) {
@@ -13,16 +13,16 @@ export function queryFirst(selectors: readonly string[], root: ParentNode = docu
   return null;
 }
 
-export function queryAllFirstMatch(selectors: readonly string[], root: ParentNode = document): HTMLElement[] {
+export function hasVisibleMatch(selectors: readonly string[], root: ParentNode = document): boolean {
   for (const sel of selectors) {
     try {
       const nodes = Array.from(root.querySelectorAll<HTMLElement>(sel));
-      if (nodes.length > 0) return nodes;
+      if (nodes.some((n) => isElementVisible(n))) return true;
     } catch {
       // Ignore invalid selector
     }
   }
-  return [];
+  return false;
 }
 
 export function isElementVisible(el: HTMLElement): boolean {
@@ -76,7 +76,6 @@ export function insertIntoInputElement(
     return true;
   }
 
-  // ContentEditable (ProseMirror / Quill / rich editors)
   const existing = (el.innerText ?? el.textContent ?? '').trim();
   if (options.replaceTrailingSlashQuery) {
     const raw = el.innerText ?? el.textContent ?? '';
@@ -107,6 +106,34 @@ export function insertIntoInputElement(
   const baseText = (el.innerText ?? el.textContent ?? '').trimEnd();
   setContentEditablePlainText(el, baseText ? `${baseText}\n\n${text}` : text);
   return true;
+}
+
+export function clickSubmitControl(buttonSelectors: readonly string[], inputEl: HTMLElement | null): boolean {
+  for (const sel of buttonSelectors) {
+    try {
+      const btn = document.querySelector<HTMLElement>(sel);
+      if (btn && isElementVisible(btn)) {
+        const disabled =
+          (btn instanceof HTMLButtonElement && btn.disabled) ||
+          btn.getAttribute('aria-disabled') === 'true';
+        if (!disabled) {
+          btn.click();
+          return true;
+        }
+      }
+    } catch {
+      // Ignore invalid selector
+    }
+  }
+
+  if (inputEl) {
+    inputEl.focus();
+    inputEl.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true })
+    );
+    return true;
+  }
+  return false;
 }
 
 function setContentEditablePlainText(el: HTMLElement, text: string): void {
@@ -151,9 +178,21 @@ export function cleanDocumentTitle(rawTitle: string, suffixes: string[]): string
   return title;
 }
 
-export function buildMessageFromNode(role: MessageRole, node: Element, thinkingNode?: Element | null): ChatMessage | null {
+export function toPlainMessages(nodes: ExtractedMessageNode[]): ChatMessage[] {
+  return nodes.map(({ role, content, thinking }) => (thinking ? { role, content, thinking } : { role, content }));
+}
+
+export function buildMessageNode(
+  index: number,
+  role: MessageRole,
+  node: Element,
+  anchorEl: HTMLElement | null,
+  thinkingNode?: Element | null
+): ExtractedMessageNode | null {
   const content = domElementToMarkdown(node).trim();
   if (!content) return null;
   const thinking = thinkingNode ? domElementToMarkdown(thinkingNode).trim() : undefined;
-  return thinking ? { role, content, thinking } : { role, content };
+  return thinking
+    ? { index, role, content, thinking, element: anchorEl }
+    : { index, role, content, element: anchorEl };
 }

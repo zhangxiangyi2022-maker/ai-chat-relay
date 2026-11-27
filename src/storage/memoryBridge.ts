@@ -1,9 +1,10 @@
-import type { StorageBridge, StorageKey } from '../types/index.js';
+import type { HttpGetResponse, StorageBridge, StorageKey } from '../types/index.js';
 
 export class MemoryStorageBridge implements StorageBridge {
   private readonly store = new Map<StorageKey, unknown>();
   private readonly listeners = new Set<(key: StorageKey) => void>();
   public lastClipboard = '';
+  public mockFetcher?: (url: string) => Promise<HttpGetResponse>;
 
   async get<T>(key: StorageKey): Promise<T | null> {
     const val = this.store.get(key);
@@ -34,5 +35,12 @@ export class MemoryStorageBridge implements StorageBridge {
   async copyToClipboard(text: string): Promise<boolean> {
     this.lastClipboard = text;
     return true;
+  }
+
+  async fetchPublicReadOnly(url: string): Promise<HttpGetResponse> {
+    if (this.mockFetcher) {
+      return this.mockFetcher(url);
+    }
+    return { ok: false, status: 404, body: 'Not mocked' };
   }
 }

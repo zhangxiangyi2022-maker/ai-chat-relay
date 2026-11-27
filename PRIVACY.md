@@ -1,34 +1,35 @@
 # Privacy Policy / 隐私保护声明
 
-**Last Updated**: 2026-11-21
+**Last Updated**: 2026-11-28
 
-ChatRelay (`ai-chat-relay`) is designed from the ground up as a **100% local-first** browser tool.
+ChatRelay (`ai-chat-relay`) is designed from the ground up as a **100% local-first** AI Cockpit.
 
-## 1. Zero Network Requests & Zero Telemetry
-- ChatRelay **never** makes outbound network requests, **never** embeds analytics or tracking scripts, and **never** transmits your prompts, conversations, or templates to any third-party server.
-- In the Userscript build, no `@connect` or `GM_xmlhttpRequest` permissions are requested.
-- In the Chrome/Edge Extension build, only the `storage` permission is requested, scoped strictly to `chatgpt.com`, `chat.openai.com`, `gemini.google.com`, `claude.ai`, and `chat.deepseek.com`.
+## 1. Zero Telemetry & Strictly Allowlisted On-Demand Verification
+- ChatRelay **never** embeds analytics, tracking scripts, or remote backends, and **never** transmits your conversation text, prompts, or pinned notes anywhere.
+- **Offline by Default**: Prompt templates, Metro Timeline, Pinboard, Dynamic Island tab status sync, Context Handoff, and Markdown Export run **100% locally** inside browser storage (`chrome.storage.local` or Tampermonkey storage).
+- **On-Demand Reality Check (Verify)**: Only when you explicitly click **Verify Packages & Repos Online**, ChatRelay queries three read-only public registries (`https://registry.npmjs.org`, `https://pypi.org`, `https://api.github.com`) with **only the extracted public package name or `owner/repo` string**—never conversation content, URLs, or user identifiers.
+- **Minimal Permissions**:
+  - Extension permissions: `storage` only; `host_permissions` strictly restricted to the three read-only package/repo registries above; content scripts strictly scoped to `chatgpt.com`, `chat.openai.com`, `gemini.google.com`, `claude.ai`, and `chat.deepseek.com`.
+  - Userscript `@connect` strictly restricted to `registry.npmjs.org`, `pypi.org`, and `api.github.com`.
 
 ## 2. Built-in Secret & PII Redaction (Enabled by Default)
-Before packaging a conversation for cross-platform Handoff or Markdown export, ChatRelay locally scans and redacts:
+Before packaging a conversation for cross-platform Handoff, Fork, Pinboard, Tab Preview, or Markdown Export, ChatRelay locally scans and redacts:
 - **Secrets & Credentials**: API keys (`sk-...`, `AIza...`, `ghp_...`, `AKIA...`, `hf_...`, `xoxb-...`), Bearer tokens / JWTs, PEM private key blocks, database URL passwords (`postgres://user:pass@host`), and sensitive environment variable values.
 - **Personal Identifiers (PII)**: Email addresses, phone numbers, national ID numbers, and formatted card numbers.
 
-Both redaction switches can be toggled anytime in Settings.
-
-## 3. Ephemeral Cross-Site Handoff Cache
-- **No Raw Conversation URLs Stored**: Handoff metadata stores only a one-way FNV-1a fingerprint (`sourceFingerprint`) to distinguish source vs. target tabs—never your raw private conversation URL.
-- **Burn-After-Read**: By default, once you click **Resume Here**, the cached handoff payload is immediately deleted from local extension/userscript storage.
-- **Auto-Expiration**: Unconsumed handoff payloads automatically expire after 30 minutes (configurable) and are purged from storage.
-- **Export Privacy**: Exported Markdown files omit source URLs by default, and neither Handoff nor Export writes to your OS clipboard history automatically unless you click **Copy** or opt in.
+## 3. Ephemeral Cross-Site Caches
+- **No Raw Conversation URLs Stored**: Handoff and Pinboard metadata store only a one-way FNV-1a fingerprint (`sourceFingerprint`)—never your raw private conversation URL.
+- **Burn-After-Read & Auto-Expire**: Cached handoff payloads auto-delete right after pasting (by default) and auto-expire after 30 minutes. Tab status entries auto-expire after 20 seconds.
+- **Zero OS Clipboard Pollution**: Handoff and Export do not write to your OS clipboard automatically unless you click **Copy** or opt in.
 
 ## 4. Full User Control
-You can purge pending handoff data or wipe all locally stored templates and settings at any time inside the Settings panel.
+You can purge pending handoff data or wipe all locally stored templates, pins, tab statuses, and settings at any time inside the Settings panel.
 
 ---
 
 ## 中文简要说明
 
-- **零联网、零统计**：所有解析、脱敏、模板管理和接力打包均在本地浏览器内完成，不向任何第三方服务器发送数据。
-- **默认开启双重脱敏**：带走接力与导出 Markdown 前自动打码 API 密钥、Token、JWT、私钥、数据库连接密码，以及邮箱、手机号、身份证号等个人隐私信息。
-- **不留存敏感痕迹**：本地缓存不保存原始对话 URL（仅存单向哈希指纹）；默认支持“填入目标平台后立即销毁（阅后即焚）”和“30 分钟自动过期自毁”；默认不主动写入系统剪贴板历史；设置页提供一键清空全部本地数据。
+- **默认纯本地、零遥测**：时间轴导航/分叉、多标签灵动岛监工、灵感背包、快捷模板、接力与 Markdown 导出**全部纯本地运行**，绝不上传任何对话文本或隐私内容。
+- **联网验真严格白名单 + 手动触发**：只有当你主动点击「联网核实存在性」时，才会向 `registry.npmjs.org`、`pypi.org`、`api.github.com` 三个公开只读官方源查询提取出的包名或仓库名，绝不夹带聊天原文。
+- **默认开启双重脱敏**：接力、分叉、钉入灵感背包、灵动岛摘要以及导出前，自动打码 API 密钥、Token、JWT、私钥、数据库连接密码及个人邮箱/手机号/身份证号。
+- **阅后即焚与一键清空**：本地缓存不存原始对话链接（仅存单向指纹），接力默认填入即焚且 30 分钟自动销毁，设置页支持一键清空全部本地数据。

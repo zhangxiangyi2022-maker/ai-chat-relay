@@ -1,11 +1,14 @@
-import { domElementToMarkdown } from '../core/domToMarkdown.js';
-import type { ChatMessage } from '../types/index.js';
+import type { ChatMessage, ExtractedMessageNode } from '../types/index.js';
 import {
+  buildMessageNode,
   cleanDocumentTitle,
+  clickSubmitControl,
+  hasVisibleMatch,
   insertIntoInputElement,
   isElementVisible,
   queryFirst,
   readInputText,
+  toPlainMessages,
 } from './shared.js';
 import type { SiteAdapter } from './types.js';
 
@@ -15,6 +18,20 @@ const INPUT_SELECTORS = [
   'textarea[placeholder*="发送消息" i]',
   'main textarea',
   'textarea',
+];
+
+const SUBMIT_SELECTORS = [
+  'div[role="button"].ds-icon-button:not([aria-disabled="true"])',
+  'button[aria-label*="Send" i]',
+  'button[aria-label*="发送" i]',
+  'button[type="submit"]',
+];
+
+const STOP_SELECTORS = [
+  '.ds-loading',
+  'button[aria-label*="Stop" i]',
+  'button[aria-label*="停止" i]',
+  '[data-testid="stop-button"]',
 ];
 
 export const deepseekAdapter: SiteAdapter = {
@@ -39,43 +56,50 @@ export const deepseekAdapter: SiteAdapter = {
     return insertIntoInputElement(input, text, options);
   },
 
-  extractMessages(): ChatMessage[] {
-    const results: ChatMessage[] = [];
+  clickSubmit(): boolean {
+    return clickSubmitControl(SUBMIT_SELECTORS, this.findInput());
+  },
 
-    // Primary strategy: .ds-message containers (assistant messages contain .ds-markdown)
+  isGenerating(): boolean {
+    return hasVisibleMatch(STOP_SELECTORS);
+  },
+
+  extractMessageNodes(): ExtractedMessageNode[] {
+    const results: ExtractedMessageNode[] = [];
+
     const dsMessages = Array.from(document.querySelectorAll<HTMLElement>('.ds-message'));
     if (dsMessages.length > 0) {
       for (const msg of dsMessages) {
         const mdBody = msg.querySelector<HTMLElement>('.ds-markdown');
         const thinkBody = msg.querySelector<HTMLElement>('.ds-think-content');
         if (mdBody) {
-          const content = domElementToMarkdown(mdBody);
-          const thinking = thinkBody ? domElementToMarkdown(thinkBody) : '';
-          if (content) {
-            results.push(thinking ? { role: 'assistant', content, thinking } : { role: 'assistant', content });
-          }
+          const built = buildMessageNode(results.length, 'assistant', mdBody, msg, thinkBody);
+          if (built) results.push(built);
         } else {
-          const content = domElementToMarkdown(msg);
-          if (content) results.push({ role: 'user', content });
+          const built = buildMessageNode(results.length, 'user', msg, msg);
+          if (built) results.push(built);
         }
       }
       if (results.length > 0) return results;
     }
 
-    // Fallback: look for .ds-markdown blocks paired with preceding user prompt siblings
     const assistantMarkdowns = Array.from(document.querySelectorAll<HTMLElement>('.ds-markdown'));
     for (const mdNode of assistantMarkdowns) {
       const turnWrap = mdNode.closest('[data-virtual-index], [class*="message"]') ?? mdNode.parentElement;
       const prev = turnWrap?.previousElementSibling;
       if (prev && !prev.querySelector('.ds-markdown')) {
-        const userText = domElementToMarkdown(prev);
-        if (userText) results.push({ role: 'user', content: userText });
+        const builtU = buildMessageNode(results.length, 'user', prev, prev as HTMLElement);
+        if (builtU) results.push(builtU);
       }
-      const assistantText = domElementToMarkdown(mdNode);
-      if (assistantText) results.push({ role: 'assistant', content: assistantText });
+      const builtA = buildMessageNode(results.length, 'assistant', mdNode, mdNode);
+      if (builtA) results.push(builtA);
     }
 
     return results;
+  },
+
+  extractMessages(): ChatMessage[] {
+    return toPlainMessages(this.extractMessageNodes());
   },
 
   getConversationTitle(): string {

@@ -14,16 +14,16 @@ const extDir = path.join(distDir, 'extension');
 const userDir = path.join(distDir, 'userscript');
 
 const USERSCRIPT_BANNER = `// ==UserScript==
-// @name         ChatRelay — Cross-AI Prompt & Context Handoff
-// @name:zh-CN   ChatRelay — 跨平台 AI 提示词与对话接力
+// @name         ChatRelay — Cross-AI Cockpit, Timeline & Reality Check
+// @name:zh-CN   ChatRelay — 跨平台 AI 驾驶舱（地铁线分叉 / 灵动岛监工 / 灵感背包 / 防幻觉验真）
 // @namespace    https://github.com/zhangxiangyi2022-maker/ai-chat-relay
 // @homepageURL  https://github.com/zhangxiangyi2022-maker/ai-chat-relay
 // @supportURL   https://github.com/zhangxiangyi2022-maker/ai-chat-relay/issues
 // @updateURL    https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest/download/chat-relay.user.js
 // @downloadURL  https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest/download/chat-relay.user.js
 // @version      ${pkg.version}
-// @description  Slash prompt templates, seamless cross-platform context handoff, and clean Markdown export for ChatGPT, Gemini, Claude, and DeepSeek.
-// @description:zh-CN 为 ChatGPT、Gemini、Claude、DeepSeek 提供 / 快捷提示词模板、跨平台对话一键接力与无损 Markdown 导出。
+// @description  Metro conversation timeline & fork, multi-tab Dynamic Island radar & broadcast, Pinboard, anti-hallucination package/GitHub verifier, slash prompts, and privacy-first handoff for ChatGPT, Gemini, Claude, and DeepSeek.
+// @description:zh-CN 为 ChatGPT、Gemini、Claude、DeepSeek 提供右侧对话地铁线分叉、顶部多标签灵动岛监工与群发、划词灵感背包、防幻觉包名/GitHub 验真、/ 快捷模板与自动脱敏接力。
 // @author       zhangxiangyi2022-maker
 // @license      MIT
 // @match        https://chatgpt.com/*
@@ -31,12 +31,16 @@ const USERSCRIPT_BANNER = `// ==UserScript==
 // @match        https://gemini.google.com/*
 // @match        https://claude.ai/*
 // @match        https://chat.deepseek.com/*
+// @connect      registry.npmjs.org
+// @connect      pypi.org
+// @connect      api.github.com
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
 // @grant        GM_addValueChangeListener
 // @grant        GM_removeValueChangeListener
 // @grant        GM_setClipboard
+// @grant        GM_xmlhttpRequest
 // @run-at       document-idle
 // ==/UserScript==
 `;
@@ -85,6 +89,11 @@ async function runBuild() {
       ...common,
       entryPoints: [path.join(rootDir, 'src/entries/extension.ts')],
       outfile: path.join(extDir, 'content.js'),
+    },
+    {
+      ...common,
+      entryPoints: [path.join(rootDir, 'src/entries/background.ts')],
+      outfile: path.join(extDir, 'background.js'),
     },
     {
       ...common,

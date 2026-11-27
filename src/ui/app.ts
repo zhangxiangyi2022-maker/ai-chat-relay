@@ -5,20 +5,37 @@ import {
   triggerTextDownload,
 } from '../core/exporter.js';
 import { buildHandoffPayload } from '../core/handoff.js';
-import { computeUrlFingerprint } from '../core/privacy.js';
+import { createPinnedSnippet } from '../core/pinboard.js';
+import { computeUrlFingerprint, redactSensitiveText } from '../core/privacy.js';
 import { BUILTIN_TEMPLATES } from '../core/templates.js';
+import { buildTimelineNodes, selectMessagesForHandoff } from '../core/timeline.js';
+import { extractVerifyCandidates, verifyCandidatesOnline } from '../core/verifier.js';
 import { formatMsg, getMessages, PLATFORM_NAMES } from '../i18n/index.js';
 import {
   clearAllLocalData,
   createDefaultSettings,
   loadActiveHandoff,
+  loadActiveTabStatuses,
   loadSettings,
   loadTemplatesWithSeed,
 } from '../storage/bridge.js';
-import type { HandoffPayload, PromptTemplate, RelaySettings, StorageBridge } from '../types/index.js';
+import type {
+  BroadcastCommand,
+  ExtractedMessageNode,
+  HandoffPayload,
+  PinnedSnippet,
+  PromptTemplate,
+  RelaySettings,
+  StorageBridge,
+  TabRunState,
+  TabStatusEntry,
+  TimelineNode,
+} from '../types/index.js';
 import { clearChildren, el, svgIcon } from './dom.js';
+import { DynamicIsland } from './island.js';
 import { PaletteModal } from './palette.js';
 import { SHADOW_CSS } from './styles.js';
+import { MetroTimeline } from './timeline.js';
 
 export interface MountOptions {
   adapter: SiteAdapter;
@@ -50,25 +67,40 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
     shadow.appendChild(style);
   }
 
+  const islandSlot = el('div');
+  const timelineSlot = el('div');
   const anchor = el('div', { className: 'cr-anchor' });
   const bannerSlot = el('div');
   const dockSlot = el('div');
+  const selectionSlot = el('div');
   const modalSlot = el('div');
   const toastSlot = el('div');
   anchor.append(bannerSlot, dockSlot);
-  shadow.append(anchor, modalSlot, toastSlot);
+  shadow.append(islandSlot, timelineSlot, anchor, selectionSlot, modalSlot, toastSlot);
 
+  const tabId = `tab-${adapter.id}-${Math.random().toString(36).slice(2, 8)}`;
   let templates: PromptTemplate[] = [];
+  let pins: PinnedSnippet[] = [];
   let settings: RelaySettings = createDefaultSettings();
   let pendingHandoff: HandoffPayload | null = null;
+  let tabStatuses: Record<string, TabStatusEntry> = {};
+  let extractedNodes: ExtractedMessageNode[] = [];
+  const mutedIndices = new Set<number>();
   let slashTriggeredFromInput = false;
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Radar state machine
+  let currentRunState: TabRunState = 'idle';
+  let streamStartedAt = 0;
+  let lastDurationSec = 0;
+  let lastNotifiedTabDoneKey = '';
+  const handledBroadcasts = new Set<string>();
 
   const showToast = (text: string) => {
     clearChildren(toastSlot);
     toastSlot.appendChild(el('div', { className: 'cr-toast', text }));
     if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => clearChildren(toastSlot), 3000);
+    toastTimer = setTimeout(() => clearChildren(toastSlot), 3200);
   };
 
   const insertIntoChat = async (text: string): Promise<boolean> => {
@@ -84,9 +116,44 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
     return false;
   };
 
+  const addPin = async (text: string, kind: 'selection' | 'turn') => {
+    const msg = getMessages(settings.locale);
+    const created = createPinnedSnippet({
+      sourcePlatform: adapter.id,
+      sourceTitle: adapter.getConversationTitle(),
+      sourceUrl: window.location.href,
+      text,
+      kind,
+      redactSecrets: settings.redactSecrets,
+      redactPii: settings.redactPii,
+    });
+    if (!created) return;
+    pins = [created, ...pins].slice(0, 60);
+    await bridge.set('pins', pins);
+    renderChrome();
+    palette.refresh();
+    showToast(msg.pinAddedToast);
+  };
+
   const palette = new PaletteModal(modalSlot, {
     getTemplates: () => templates,
+    getPins: () => pins,
     getSettings: () => settings,
+    scanVerifyContext: () => {
+      const nodes = adapter.extractMessageNodes();
+      const active = selectMessagesForHandoff(nodes, { mutedIndices });
+      return extractVerifyCandidates(active);
+    },
+    runOnlineVerify: async (candidates) => {
+      if (!bridge.fetchPublicReadOnly) {
+        return candidates.map((c) => ({
+          ...c,
+          status: 'error',
+          detail: 'Online verification unavailable in this environment',
+        }));
+      }
+      return verifyCandidatesOnline(candidates, (url) => bridge.fetchPublicReadOnly!(url));
+    },
     onSaveTemplates: async (next) => {
       templates = next;
       await bridge.set('templates', next);
@@ -99,10 +166,22 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
       await bridge.set('templates', merged);
       showToast(msg.toastBuiltinsRestored);
     },
+    onDeletePin: async (id) => {
+      pins = pins.filter((p) => p.id !== id);
+      await bridge.set('pins', pins);
+      renderChrome();
+      palette.refresh();
+    },
+    onClearPins: async () => {
+      pins = [];
+      await bridge.remove('pins');
+      renderChrome();
+      palette.refresh();
+    },
     onUpdateSettings: async (patch) => {
       settings = { ...settings, ...patch };
       await bridge.set('settings', settings);
-      renderChrome();
+      renderAll();
       palette.refresh();
     },
     onClearHandoff: async () => {
@@ -115,11 +194,13 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
     onClearAllData: async () => {
       const msg = getMessages(settings.locale);
       pendingHandoff = null;
+      pins = [];
+      tabStatuses = {};
       await clearAllLocalData(bridge);
       const reloaded = await loadTemplatesWithSeed(bridge);
       templates = reloaded.templates;
       settings = reloaded.settings;
-      renderChrome();
+      renderAll();
       palette.refresh();
       showToast(msg.toastPrivacyCleared);
     },
@@ -131,25 +212,98 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
       await bridge.copyToClipboard(text);
       showToast(msg.toastCopied);
     },
+    onDownloadMarkdown: (filename, content) => {
+      triggerTextDownload(filename, content);
+    },
     onNotify: (text) => showToast(text),
   });
 
-  const handleHandoffPackage = async () => {
+  const timeline = new MetroTimeline(timelineSlot, {
+    onJump: (node: TimelineNode) => {
+      const target = node.element;
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const prevOutline = target.style.outline;
+      const prevOffset = target.style.outlineOffset;
+      target.style.outline = '2px solid #3b82f6';
+      target.style.outlineOffset = '4px';
+      setTimeout(() => {
+        target.style.outline = prevOutline;
+        target.style.outlineOffset = prevOffset;
+      }, 1500);
+    },
+    onFork: (node: TimelineNode) => {
+      void handleHandoffPackage(node.index);
+    },
+    onPinTurn: (node: TimelineNode) => {
+      const matched = extractedNodes.find((n) => n.index === node.index);
+      if (matched) {
+        void addPin(matched.content, 'turn');
+      }
+    },
+    onToggleMute: (node: TimelineNode) => {
+      if (mutedIndices.has(node.index)) {
+        mutedIndices.delete(node.index);
+      } else {
+        mutedIndices.add(node.index);
+      }
+      renderTimeline();
+    },
+  });
+
+  const island = new DynamicIsland(islandSlot, {
+    onSendBroadcast: async (promptText, targetTabIds, autoSubmit) => {
+      const msg = getMessages(settings.locale);
+      const trimmed = promptText.trim();
+      if (!trimmed || targetTabIds.length === 0) {
+        showToast(msg.broadcastNoTargetToast);
+        return;
+      }
+      const cmd: BroadcastCommand = {
+        id: `bc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        targetTabIds,
+        promptText: trimmed,
+        autoSubmit,
+        createdAt: Date.now(),
+        consumedBy: [],
+      };
+      await bridge.set('broadcast', cmd);
+      await applyBroadcastIfTargeted(cmd);
+      showToast(formatMsg(msg.broadcastSentToast, { count: targetTabIds.length }));
+    },
+    onCopyPreview: async (text) => {
+      const msg = getMessages(settings.locale);
+      await bridge.copyToClipboard(text);
+      showToast(msg.toastCopied);
+    },
+    onEnableNotifications: async () => {
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        await Notification.requestPermission();
+        renderIsland();
+      }
+    },
+  });
+
+  const handleHandoffPackage = async (upToIndex?: number) => {
     const msg = getMessages(settings.locale);
-    const messages = adapter.extractMessages();
+    const nodes = adapter.extractMessageNodes();
+    extractedNodes = nodes;
+    const messages = selectMessagesForHandoff(nodes, { upToIndex, mutedIndices });
     if (messages.length === 0) {
       showToast(msg.toastNoMessages);
       return;
     }
 
+    const isFork = upToIndex !== undefined;
     const payload = buildHandoffPayload({
       sourcePlatform: adapter.id,
       sourceTitle: adapter.getConversationTitle(),
       sourceUrl: window.location.href,
       messages,
-      mode: settings.handoffMode,
+      mode: isFork ? 'full' : settings.handoffMode,
       maxCompactTurns: settings.maxCompactTurns,
       locale: settings.locale,
+      isFork,
       redactSecrets: settings.redactSecrets,
       redactPii: settings.redactPii,
       ttlMinutes: settings.handoffTtlMinutes,
@@ -166,7 +320,14 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
     }
     renderChrome();
 
-    if (payload.redactedCount > 0) {
+    if (isFork) {
+      showToast(
+        formatMsg(msg.toastForkSaved, {
+          turn: (upToIndex ?? 0) + 1,
+          count: payload.includedCount,
+        })
+      );
+    } else if (payload.redactedCount > 0) {
       showToast(
         formatMsg(msg.toastHandoffSavedRedacted, {
           platform: PLATFORM_NAMES[adapter.id],
@@ -186,7 +347,9 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
 
   const handleExportMarkdown = async () => {
     const msg = getMessages(settings.locale);
-    const messages = adapter.extractMessages();
+    const nodes = adapter.extractMessageNodes();
+    extractedNodes = nodes;
+    const messages = selectMessagesForHandoff(nodes, { mutedIndices });
     if (messages.length === 0) {
       showToast(msg.toastNoMessages);
       return;
@@ -232,8 +395,7 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
       void bridge.remove('handoff');
     }
 
-    // Show cross-site handoff banner when there's a valid pending handoff from another conversation/site
-    if (pendingHandoff && pendingHandoff.sourceFingerprint !== currentFingerprint) {
+    if (pendingHandoff && (pendingHandoff.isFork || pendingHandoff.sourceFingerprint !== currentFingerprint)) {
       const ho = pendingHandoff;
       const sourceName = PLATFORM_NAMES[ho.sourcePlatform];
       const modeLabel = ho.mode === 'compact' ? msg.handoffModeCompact : msg.handoffModeFull;
@@ -247,6 +409,9 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
         ho.redactedCount > 0
           ? formatMsg(msg.handoffRedactedMeta, { count: ho.redactedCount })
           : '';
+      const headingText = ho.isFork
+        ? formatMsg(msg.handoffForkTitle, { platform: sourceName, turns: ho.includedCount })
+        : formatMsg(msg.handoffBannerTitle, { platform: sourceName });
 
       bannerSlot.appendChild(
         el(
@@ -255,8 +420,8 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
           el(
             'div',
             { className: 'cr-handoff-title' },
-            svgIcon('relay', 14),
-            el('span', { text: formatMsg(msg.handoffBannerTitle, { platform: sourceName }) })
+            svgIcon(ho.isFork ? 'fork' : 'relay', 14),
+            el('span', { text: headingText })
           ),
           el('div', {
             className: 'cr-handoff-meta',
@@ -331,6 +496,27 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
           'button',
           {
             className: 'cr-btn',
+            title: msg.pinboardTitle,
+            onClick: () => palette.openPinboard(),
+          },
+          svgIcon('pin', 14),
+          el('span', { text: msg.pinboardBtn }),
+          pins.length > 0 ? el('span', { className: 'cr-badge-count', text: String(pins.length) }) : null
+        ),
+        el(
+          'button',
+          {
+            className: 'cr-btn',
+            title: msg.verifierTitle,
+            onClick: () => palette.openVerifier(),
+          },
+          svgIcon('shield', 14),
+          el('span', { text: msg.verifyBtn })
+        ),
+        el(
+          'button',
+          {
+            className: 'cr-btn',
             title: msg.exportBtn,
             onClick: () => void handleExportMarkdown(),
           },
@@ -350,6 +536,157 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
     );
   };
 
+  const renderTimeline = () => {
+    extractedNodes = adapter.extractMessageNodes();
+    const nodes = buildTimelineNodes(extractedNodes, mutedIndices);
+    timeline.render(nodes, adapter.id, settings.locale, settings.showTimeline);
+  };
+
+  const renderIsland = () => {
+    const activeTabs = Object.values(tabStatuses).filter((t) => t.expiresAt > Date.now());
+    island.render(
+      activeTabs,
+      tabId,
+      settings.locale,
+      settings.showDynamicIsland,
+      settings.notifyOnBackgroundDone
+    );
+  };
+
+  const renderAll = () => {
+    renderChrome();
+    renderTimeline();
+    renderIsland();
+  };
+
+  const syncTabHeartbeat = async (force = false) => {
+    const generating = adapter.isGenerating();
+    const now = Date.now();
+    let stateChanged = force;
+
+    if (generating) {
+      if (currentRunState !== 'streaming') {
+        currentRunState = 'streaming';
+        streamStartedAt = now;
+        stateChanged = true;
+      }
+    } else if (currentRunState === 'streaming') {
+      currentRunState = 'done';
+      lastDurationSec = Math.max(1, Math.round((now - streamStartedAt) / 1000));
+      stateChanged = true;
+    }
+
+    const nodes = adapter.extractMessageNodes();
+    extractedNodes = nodes;
+    const lastAssistant = [...nodes].reverse().find((n) => n.role === 'assistant');
+    const rawPreview = lastAssistant?.content.slice(0, 260) ?? '';
+    const safePreview = redactSensitiveText(rawPreview, {
+      redactSecrets: settings.redactSecrets,
+      redactPii: settings.redactPii,
+    }).text;
+    const safeTitle = redactSensitiveText(
+      adapter.getConversationTitle() || PLATFORM_NAMES[adapter.id],
+      { redactSecrets: settings.redactSecrets, redactPii: settings.redactPii }
+    ).text;
+
+    const currentEntry: TabStatusEntry = {
+      tabId,
+      platform: adapter.id,
+      title: safeTitle,
+      state: currentRunState,
+      startedAt: streamStartedAt || now,
+      updatedAt: now,
+      expiresAt: now + 20_000,
+      lastDurationSec,
+      lastPreview: safePreview,
+    };
+
+    const existingMap = await loadActiveTabStatuses(bridge, now);
+    existingMap[tabId] = currentEntry;
+    tabStatuses = existingMap;
+
+    if (stateChanged || !island.isOpenPopover()) {
+      await bridge.set('tab_statuses', existingMap);
+    }
+
+    renderTimeline();
+    renderIsland();
+  };
+
+  const applyBroadcastIfTargeted = async (cmd: BroadcastCommand | null) => {
+    if (!cmd || handledBroadcasts.has(cmd.id)) return;
+    if (!cmd.targetTabIds.includes(tabId)) return;
+    if (Date.now() - cmd.createdAt > 30_000) return;
+
+    handledBroadcasts.add(cmd.id);
+    const ok = adapter.insertText(cmd.promptText);
+    if (ok && cmd.autoSubmit) {
+      setTimeout(() => {
+        adapter.clickSubmit();
+      }, 150);
+    }
+  };
+
+  const maybeNotifyBackgroundCompletion = (map: Record<string, TabStatusEntry>) => {
+    if (!settings.notifyOnBackgroundDone) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+
+    for (const entry of Object.values(map)) {
+      if (entry.state !== 'done') continue;
+      if (entry.tabId === tabId && !document.hidden) continue;
+      const doneKey = `${entry.tabId}:${entry.startedAt}`;
+      if (doneKey === lastNotifiedTabDoneKey) continue;
+      if (Date.now() - entry.updatedAt > 12_000) continue;
+
+      lastNotifiedTabDoneKey = doneKey;
+      const msg = getMessages(settings.locale);
+      const sec = entry.lastDurationSec ?? 1;
+      new Notification(`${PLATFORM_NAMES[entry.platform]} · ${formatMsg(msg.islandDone, { sec })}`, {
+        body: entry.lastPreview.slice(0, 100) || entry.title,
+      });
+    }
+  };
+
+  const onDocumentMouseUp = () => {
+    clearChildren(selectionSlot);
+    if (!settings.selectionPinbar) return;
+    const sel = window.getSelection();
+    const selectedText = sel?.toString().trim() ?? '';
+    if (selectedText.length < 6 || !sel || sel.rangeCount === 0) return;
+
+    const range = sel.getRangeAt(0);
+    const containerEl =
+      range.commonAncestorContainer.nodeType === 1
+        ? (range.commonAncestorContainer as Element)
+        : range.commonAncestorContainer.parentElement;
+    if (!containerEl || host.contains(containerEl)) return;
+    if (containerEl.closest('textarea, input, [contenteditable="true"]')) return;
+
+    const rect = range.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) return;
+
+    const msg = getMessages(settings.locale);
+    const pill = el(
+      'button',
+      {
+        className: 'cr-selection-pill',
+        onClick: (e) => {
+          e.stopPropagation();
+          clearChildren(selectionSlot);
+          sel.removeAllRanges();
+          void addPin(selectedText, 'selection');
+        },
+      },
+      svgIcon('pin', 12),
+      el('span', { text: msg.pinSelectionBtn })
+    );
+    const topPos = Math.max(52, rect.top - 36);
+    const leftPos = Math.min(window.innerWidth - 130, Math.max(12, rect.left));
+    pill.style.top = `${Math.round(topPos)}px`;
+    pill.style.left = `${Math.round(leftPos)}px`;
+    selectionSlot.appendChild(pill);
+  };
+
   const onDocumentInput = (e: Event) => {
     if (!settings.slashTrigger || palette.isOpen()) return;
     const target = e.target as HTMLElement | null;
@@ -366,10 +703,13 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' && palette.isOpen()) {
-      e.preventDefault();
-      slashTriggeredFromInput = false;
-      palette.close();
+    if (e.key === 'Escape') {
+      clearChildren(selectionSlot);
+      if (palette.isOpen()) {
+        e.preventDefault();
+        slashTriggeredFromInput = false;
+        palette.close();
+      }
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
@@ -383,21 +723,20 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
     }
   };
 
+  document.addEventListener('mouseup', onDocumentMouseUp, true);
   document.addEventListener('input', onDocumentInput, true);
   window.addEventListener('keydown', onKeyDown, true);
 
   let lastHref = window.location.href;
-  const hrefTimer = setInterval(() => {
-    const expired =
-      pendingHandoff !== null &&
-      pendingHandoff.expiresAt > 0 &&
-      Date.now() >= pendingHandoff.expiresAt;
-
-    if (window.location.href !== lastHref || expired) {
+  const pollTimer = setInterval(() => {
+    if (window.location.href !== lastHref) {
       lastHref = window.location.href;
+      mutedIndices.clear();
+      currentRunState = 'idle';
       renderChrome();
     }
-  }, 1000);
+    void syncTabHeartbeat();
+  }, 2500);
 
   const unsubscribe = bridge.subscribe((changedKey) => {
     void (async () => {
@@ -407,9 +746,20 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
       } else if (changedKey === 'templates') {
         templates = (await bridge.get<PromptTemplate[]>('templates')) ?? [];
         palette.refresh();
+      } else if (changedKey === 'pins') {
+        pins = (await bridge.get<PinnedSnippet[]>('pins')) ?? [];
+        renderChrome();
+        palette.refresh();
+      } else if (changedKey === 'tab_statuses') {
+        tabStatuses = await loadActiveTabStatuses(bridge);
+        maybeNotifyBackgroundCompletion(tabStatuses);
+        renderIsland();
+      } else if (changedKey === 'broadcast') {
+        const cmd = await bridge.get<BroadcastCommand>('broadcast');
+        await applyBroadcastIfTargeted(cmd);
       } else if (changedKey === 'settings') {
         settings = await loadSettings(bridge);
-        renderChrome();
+        renderAll();
         palette.refresh();
       }
     })();
@@ -419,14 +769,17 @@ export function mountChatRelay({ adapter, bridge }: MountOptions): () => void {
     const loaded = await loadTemplatesWithSeed(bridge);
     templates = loaded.templates;
     settings = loaded.settings;
+    pins = (await bridge.get<PinnedSnippet[]>('pins')) ?? [];
     pendingHandoff = await loadActiveHandoff(bridge);
-    renderChrome();
+    await syncTabHeartbeat(true);
+    renderAll();
   })();
 
   return () => {
+    document.removeEventListener('mouseup', onDocumentMouseUp, true);
     document.removeEventListener('input', onDocumentInput, true);
     window.removeEventListener('keydown', onKeyDown, true);
-    clearInterval(hrefTimer);
+    clearInterval(pollTimer);
     unsubscribe();
     host.remove();
   };

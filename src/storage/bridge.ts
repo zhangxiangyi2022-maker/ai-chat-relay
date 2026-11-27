@@ -1,5 +1,12 @@
 import { detectDefaultLocale } from '../i18n/index.js';
-import type { HandoffPayload, PromptTemplate, RelaySettings, StorageBridge, StorageKey } from '../types/index.js';
+import type {
+  HandoffPayload,
+  PromptTemplate,
+  RelaySettings,
+  StorageBridge,
+  StorageKey,
+  TabStatusEntry,
+} from '../types/index.js';
 import { BUILTIN_TEMPLATES } from '../core/templates.js';
 
 export const STORAGE_PREFIX = 'chat_relay_v1_';
@@ -22,6 +29,10 @@ export function createDefaultSettings(): RelaySettings {
     handoffTtlMinutes: 30,
     includeSourceUrlInExport: false,
     autoCopyToClipboard: false,
+    showTimeline: true,
+    showDynamicIsland: true,
+    notifyOnBackgroundDone: true,
+    selectionPinbar: true,
   };
 }
 
@@ -43,6 +54,20 @@ export async function loadActiveHandoff(bridge: StorageBridge, now = Date.now())
   return payload;
 }
 
+export async function loadActiveTabStatuses(
+  bridge: StorageBridge,
+  now = Date.now()
+): Promise<Record<string, TabStatusEntry>> {
+  const map = (await bridge.get<Record<string, TabStatusEntry>>('tab_statuses')) ?? {};
+  const active: Record<string, TabStatusEntry> = {};
+  for (const [id, entry] of Object.entries(map)) {
+    if (entry && entry.expiresAt > now) {
+      active[id] = entry;
+    }
+  }
+  return active;
+}
+
 export async function loadTemplatesWithSeed(bridge: StorageBridge): Promise<{
   templates: PromptTemplate[];
   settings: RelaySettings;
@@ -62,7 +87,14 @@ export async function loadTemplatesWithSeed(bridge: StorageBridge): Promise<{
 }
 
 export async function clearAllLocalData(bridge: StorageBridge): Promise<void> {
-  await Promise.all([bridge.remove('handoff'), bridge.remove('templates'), bridge.remove('settings')]);
+  await Promise.all([
+    bridge.remove('handoff'),
+    bridge.remove('templates'),
+    bridge.remove('settings'),
+    bridge.remove('pins'),
+    bridge.remove('tab_statuses'),
+    bridge.remove('broadcast'),
+  ]);
 }
 
 export async function copyWithFallback(text: string): Promise<boolean> {

@@ -1,37 +1,41 @@
-# ChatRelay
+# ChatRelay — Cross-AI Cockpit
 
 [![Release](https://img.shields.io/github/v/release/zhangxiangyi2022-maker/ai-chat-relay?style=flat-square)](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/zhangxiangyi2022-maker/ai-chat-relay/ci.yml?style=flat-square&label=CI)](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](./LICENSE)
-[![Privacy: 100% Local](https://img.shields.io/badge/Privacy-100%25%20Local%20%26%20Auto--Redact-16a34a?style=flat-square)](./PRIVACY.md)
+[![Privacy: Local-First](https://img.shields.io/badge/Privacy-Local--First%20%26%20Auto--Redact-16a34a?style=flat-square)](./PRIVACY.md)
 
-[中文文档](./README.zh-CN.md) · [Privacy Policy](./PRIVACY.md) · [Request New AI Platform](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/issues/new?template=platform_request.yml)
+[中文文档](./README.zh-CN.md) · [Privacy Policy](./PRIVACY.md) · [GreasyFork](https://greasyfork.org/zh-CN/scripts/607263-chatrelay-cross-ai-prompt-context-handoff) · [Request New AI Platform](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/issues/new?template=platform_request.yml)
 
-**Cross-AI Prompt Palette, Context Handoff, and Clean Markdown Exporter** for **ChatGPT, Gemini, Claude, and DeepSeek** — built from a single TypeScript codebase into both a **Chrome/Edge Extension (MV3)** and a **Tampermonkey/Violentmonkey Userscript**.
+**Cross-AI Cockpit & HUD** for **ChatGPT, Gemini, Claude, and DeepSeek** — built from a single TypeScript codebase into both a **Chrome/Edge Extension (MV3)** and a **Tampermonkey/Violentmonkey Userscript**.
 
 ## Preview
 
-| Cross-Platform Context Handoff | `/` Prompt & Playbook Palette | Built-in Privacy & Auto-Redaction |
-| :---: | :---: | :---: |
-| ![Cross-Platform Context Handoff](./docs/preview-handoff.png) | ![Slash Prompt Palette](./docs/preview-palette.png) | ![Privacy Settings](./docs/preview-privacy.png) |
+| Dynamic Island, Timeline & Handoff | Anti-Hallucination Reality Check |
+| :---: | :---: |
+| ![Cross-Platform Cockpit](./docs/preview-handoff.png) | ![Package and Repo Verifier](./docs/preview-verify.png) |
 
-## Features
+| `/` Prompt & Playbook Palette | Built-in Privacy & HUD Controls |
+| :---: | :---: |
+| ![Slash Prompt Palette](./docs/preview-palette.png) | ![Privacy Settings](./docs/preview-privacy.png) |
 
-- **`/` Slash Command & Prompt Playbook Palette**
-  - Type `/` in any supported chat box (or press `Ctrl+Shift+P` / `Cmd+Shift+P`) to summon your templates.
-  - Supports `{{variable}}` placeholders with a quick fill-in modal before inserting.
-  - Includes 8 built-in bilingual templates (`/debug`, `/review`, `/translate`, `/tldr`, `/refactor`, `/prompt`, `/handoff-brief`, `/playbook`) plus custom CRUD, Markdown Playbook import/export, and JSON import.
-- **Cross-Platform Context Handoff ("Relay Baton")**
-  - Stuck or hitting rate limits on Gemini / ChatGPT / Claude / DeepSeek? Click **Handoff** to package the conversation into a structured briefing prompt (Compact mode keeps your initial goal + recent turns; Full mode keeps everything).
-  - Switch to another AI tab and a floating **"Pending Handoff"** capsule appears automatically so you can resume in one click.
-- **Lossless Markdown Export**
-  - Converts DOM conversation turns to clean Markdown with detected code block languages, stripped `"Copy code"` UI chrome, KaTeX LaTeX extraction (`$...$` / `$$...$$`), pipe tables, and optional model thinking blocks.
-- **100% Local & Privacy-First**
-  - Zero backend server, zero telemetry, zero network requests. Shadow DOM UI built with pure DOM APIs (`innerHTML`-free) for strict Trusted Types sites like `gemini.google.com`.
-  - **Auto-Redaction On by Default**: Automatically masks API keys, JWTs, private keys, DB passwords, emails, and phone numbers before Handoff or Markdown export.
-  - **Burn-After-Read & Auto-Expire**: Handoff cache stores only a one-way URL fingerprint (never raw conversation URLs), auto-purges right after pasting, and expires after 30 minutes. See [PRIVACY.md](./PRIVACY.md).
-- **Dual Build from One Codebase**
-  - `npm run build` outputs both `dist/extension/` (+ `dist/chat-relay-extension.zip`) and `dist/userscript/chat-relay.user.js`.
+## Features (`v1.0`)
+
+1. **Right-Edge Metro Timeline & Conversation Fork**
+   - Floating dot-rail timeline along the right edge with badges for `Code`, `Math`, and `Table`.
+   - Click to jump & highlight any turn, **Mute** wrong/noisy turns so they are excluded from exports, or **Fork Here** to package turns `1..k` into a clean new branch.
+2. **Multi-Tab Dynamic Island Radar & Broadcast**
+   - Sleek top pill tracking all open AI tabs in real time (`Thinking 14s...`, `Done 22s`, `Idle`) with optional native desktop notifications when a background model finishes.
+   - **Broadcast Prompt**: type once and dispatch to multiple open AI tabs simultaneously (fill-only or auto-submit).
+3. **Pinboard ("Idea Backpack")**
+   - Highlight any text inside a chat to click **Pin Snippet**, or pin any turn directly from the Timeline.
+   - Collect snippets across ChatGPT/Gemini/Claude/DeepSeek, export as a clean Markdown note, or feed all pins to your current AI.
+4. **Anti-Hallucination Reality Check (`Verify`)**
+   - Automatically scans AI replies for `npm` packages, `PyPI` packages, `GitHub` repos, and suspicious placeholder URLs (`example.com`, `localhost`).
+   - On-demand button verifies existence/versions/stars directly against `registry.npmjs.org`, `pypi.org`, and `api.github.com` (never sends chat text) and generates a 1-click **"Hallucination Challenge"** prompt if any 404s appear.
+5. **Cross-Platform Handoff, `/` Prompt Palette & Lossless Markdown Export**
+   - Type `/` (or `Ctrl+Shift+P`) for 8 built-in bilingual templates with `{{var}}` fill-in modal and Markdown/JSON import-export.
+   - 1-click **Handoff** across tabs with **auto-redaction** of API keys, JWTs, private keys, DB passwords, emails, and phone numbers + **burn-after-read** & **30-min auto-expiry**. See [PRIVACY.md](./PRIVACY.md).
 
 ## Supported Platforms
 
@@ -40,21 +44,17 @@
 - **Claude**: `https://claude.ai/`
 - **DeepSeek**: `https://chat.deepseek.com/`
 
-Want another platform (Grok, Kimi, Perplexity, Qwen)? [Open a Platform Request](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/issues/new?template=platform_request.yml).
-
 ## Installation
 
 ### Option 1: Chrome / Edge Extension (No extra extension required)
 
 1. Download [`chat-relay-extension.zip`](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest/download/chat-relay-extension.zip) from [Releases](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest) (or run `npm run build` locally) and unzip it.
-2. Open `chrome://extensions/` (or `edge://extensions/`).
-3. Enable **Developer mode** (top right).
-4. Click **Load unpacked** and select the unzipped extension folder (`dist/extension/`).
+2. Open `chrome://extensions/` (or `edge://extensions/`), enable **Developer mode**, click **Load unpacked**, and select the unzipped folder.
 
 ### Option 2: Userscript (Tampermonkey / Violentmonkey)
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/).
-2. Click to install directly: [**Install `chat-relay.user.js`**](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest/download/chat-relay.user.js) (or open `dist/userscript/chat-relay.user.js` after building locally).
+2. Install via [GreasyFork](https://greasyfork.org/zh-CN/scripts/607263-chatrelay-cross-ai-prompt-context-handoff) or direct [GitHub Release script](https://github.com/zhangxiangyi2022-maker/ai-chat-relay/releases/latest/download/chat-relay.user.js).
 
 ## Development
 
@@ -63,22 +63,6 @@ npm install
 npm run typecheck
 npm test
 npm run build
-```
-
-Dual build outputs:
-- `dist/extension/` — unpacked Chrome/Edge MV3 extension
-- `dist/chat-relay-extension.zip` — zipped extension package
-- `dist/userscript/chat-relay.user.js` — single-file Userscript
-
-## Architecture
-
-```text
-src/
-├── adapters/   # ChatGPT, Gemini, Claude, DeepSeek DOM extractors & input injectors
-├── core/       # DOM-to-Markdown, privacy redaction, templates engine, handoff, exporter
-├── storage/    # Shared StorageBridge (GM_* APIs / chrome.storage.local / Memory)
-├── ui/         # Trusted-Types-safe Shadow DOM dock, palette modal, handoff capsule
-└── entries/    # Dual-build entry points (extension.ts, popup.ts, userscript.ts)
 ```
 
 ## License

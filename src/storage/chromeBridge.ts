@@ -1,4 +1,5 @@
-import type { StorageBridge, StorageKey } from '../types/index.js';
+import { isAllowedVerifyUrl } from '../core/verifier.js';
+import type { HttpGetResponse, StorageBridge, StorageKey } from '../types/index.js';
 import { copyWithFallback, STORAGE_PREFIX, storageFullKey } from './bridge.js';
 
 export class ChromeStorageBridge implements StorageBridge {
@@ -36,5 +37,19 @@ export class ChromeStorageBridge implements StorageBridge {
 
   async copyToClipboard(text: string): Promise<boolean> {
     return copyWithFallback(text);
+  }
+
+  async fetchPublicReadOnly(url: string): Promise<HttpGetResponse> {
+    if (!isAllowedVerifyUrl(url)) {
+      return { ok: false, status: 403, body: 'Blocked non-allowlisted domain' };
+    }
+    const response = await chrome.runtime.sendMessage({
+      type: 'CHAT_RELAY_FETCH_PUBLIC',
+      url,
+    }) as HttpGetResponse | undefined;
+    if (!response) {
+      return { ok: false, status: 0, body: 'No response from extension background worker' };
+    }
+    return response;
   }
 }

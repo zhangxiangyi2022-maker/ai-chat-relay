@@ -1,7 +1,7 @@
 {
   "name": "ai-chat-relay",
-  "version": "0.1.1",
-  "description": "Cross-AI Slash Prompt Palette, Context Handoff & Clean Markdown Exporter for ChatGPT, Gemini, Claude, and DeepSeek.",
+  "version": "1.0.0",
+  "description": "Cross-AI Cockpit: Metro timeline & fork, multi-tab Dynamic Island radar & broadcast, Pinboard, anti-hallucination package/repo verifier, and privacy-first handoff.",
   "homepage": "https://github.com/zhangxiangyi2022-maker/ai-chat-relay",
   "repository": {
     "type": "git",

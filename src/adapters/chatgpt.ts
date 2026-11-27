@@ -1,11 +1,14 @@
-import { domElementToMarkdown } from '../core/domToMarkdown.js';
-import type { ChatMessage, MessageRole } from '../types/index.js';
+import type { ChatMessage, ExtractedMessageNode, MessageRole } from '../types/index.js';
 import {
+  buildMessageNode,
   cleanDocumentTitle,
+  clickSubmitControl,
+  hasVisibleMatch,
   insertIntoInputElement,
   isElementVisible,
   queryFirst,
   readInputText,
+  toPlainMessages,
 } from './shared.js';
 import type { SiteAdapter } from './types.js';
 
@@ -14,6 +17,21 @@ const INPUT_SELECTORS = [
   'div.ProseMirror[contenteditable="true"]',
   'textarea[data-id="root"]',
   'form textarea',
+];
+
+const SUBMIT_SELECTORS = [
+  'button[data-testid="send-button"]',
+  'button[aria-label*="Send prompt" i]',
+  'button[aria-label*="Send" i]',
+  'button[aria-label*="发送" i]',
+];
+
+const STOP_SELECTORS = [
+  'button[data-testid="stop-button"]',
+  'button[aria-label*="Stop generating" i]',
+  'button[aria-label*="Stop streaming" i]',
+  'button[aria-label*="停止" i]',
+  '.result-streaming',
 ];
 
 export const chatgptAdapter: SiteAdapter = {
@@ -38,8 +56,16 @@ export const chatgptAdapter: SiteAdapter = {
     return insertIntoInputElement(input, text, options);
   },
 
-  extractMessages(): ChatMessage[] {
-    const results: ChatMessage[] = [];
+  clickSubmit(): boolean {
+    return clickSubmitControl(SUBMIT_SELECTORS, this.findInput());
+  },
+
+  isGenerating(): boolean {
+    return hasVisibleMatch(STOP_SELECTORS);
+  },
+
+  extractMessageNodes(): ExtractedMessageNode[] {
+    const results: ExtractedMessageNode[] = [];
     const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-message-author-role]'));
 
     if (nodes.length > 0) {
@@ -49,22 +75,24 @@ export const chatgptAdapter: SiteAdapter = {
         const role: MessageRole = rawRole;
         const contentRoot =
           node.querySelector<HTMLElement>('.markdown, .whitespace-pre-wrap') ?? node;
-        const md = domElementToMarkdown(contentRoot);
-        if (md) results.push({ role, content: md });
+        const built = buildMessageNode(results.length, role, contentRoot, node);
+        if (built) results.push(built);
       }
       return results;
     }
 
-    // Fallback: article conversation turns
     const turns = Array.from(document.querySelectorAll<HTMLElement>('article[data-testid^="conversation-turn-"]'));
     for (let i = 0; i < turns.length; i++) {
       const turn = turns[i];
       if (!turn) continue;
-      const md = domElementToMarkdown(turn);
-      if (!md) continue;
-      results.push({ role: i % 2 === 0 ? 'user' : 'assistant', content: md });
+      const built = buildMessageNode(results.length, i % 2 === 0 ? 'user' : 'assistant', turn, turn);
+      if (built) results.push(built);
     }
     return results;
+  },
+
+  extractMessages(): ChatMessage[] {
+    return toPlainMessages(this.extractMessageNodes());
   },
 
   getConversationTitle(): string {

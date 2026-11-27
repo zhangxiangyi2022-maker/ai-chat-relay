@@ -30,6 +30,7 @@ export interface BuildHandoffInput {
   mode: HandoffMode;
   maxCompactTurns: number;
   locale: Locale;
+  isFork?: boolean;
   redactSecrets?: boolean;
   redactPii?: boolean;
   ttlMinutes?: number;
@@ -134,6 +135,7 @@ export function buildHandoffPayload(input: BuildHandoffInput): HandoffPayload | 
     messageCount: nonEmpty.length,
     includedCount: selected.length,
     redactedCount: totalRedacted,
+    isFork: input.isFork,
     createdAt,
     expiresAt,
     mode: input.mode,

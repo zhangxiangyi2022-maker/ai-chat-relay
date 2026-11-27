@@ -1,11 +1,14 @@
-import { domElementToMarkdown } from '../core/domToMarkdown.js';
-import type { ChatMessage } from '../types/index.js';
+import type { ChatMessage, ExtractedMessageNode } from '../types/index.js';
 import {
+  buildMessageNode,
   cleanDocumentTitle,
+  clickSubmitControl,
+  hasVisibleMatch,
   insertIntoInputElement,
   isElementVisible,
   queryFirst,
   readInputText,
+  toPlainMessages,
 } from './shared.js';
 import type { SiteAdapter } from './types.js';
 
@@ -14,6 +17,20 @@ const INPUT_SELECTORS = [
   '[contenteditable="true"][data-testid="chat-input"]',
   'fieldset [contenteditable="true"]',
   '[contenteditable="true"][aria-label*="Claude" i]',
+];
+
+const SUBMIT_SELECTORS = [
+  'button[aria-label*="Send message" i]',
+  'button[aria-label*="Send Message" i]',
+  'button[aria-label*="发送" i]',
+  'fieldset button[type="submit"]',
+];
+
+const STOP_SELECTORS = [
+  'button[aria-label*="Stop response" i]',
+  'button[aria-label*="Stop generating" i]',
+  'button[aria-label*="停止" i]',
+  '[data-is-streaming="true"]',
 ];
 
 export const claudeAdapter: SiteAdapter = {
@@ -38,15 +55,22 @@ export const claudeAdapter: SiteAdapter = {
     return insertIntoInputElement(input, text, options);
   },
 
-  extractMessages(): ChatMessage[] {
-    const results: ChatMessage[] = [];
+  clickSubmit(): boolean {
+    return clickSubmitControl(SUBMIT_SELECTORS, this.findInput());
+  },
+
+  isGenerating(): boolean {
+    return hasVisibleMatch(STOP_SELECTORS);
+  },
+
+  extractMessageNodes(): ExtractedMessageNode[] {
+    const results: ExtractedMessageNode[] = [];
     const nodes = Array.from(
       document.querySelectorAll<HTMLElement>(
         '[data-testid="user-message"], [data-testid^="assistant-message"], .font-claude-response, .font-claude-message'
       )
     );
 
-    // Filter out nested matches inside an already matched message container
     const topLevel = nodes.filter(
       (node) => !nodes.some((other) => other !== node && other.contains(node))
     );
@@ -54,12 +78,14 @@ export const claudeAdapter: SiteAdapter = {
     for (const node of topLevel) {
       const testId = node.getAttribute('data-testid') ?? '';
       const isUser = testId === 'user-message';
-      const content = domElementToMarkdown(node);
-      if (content) {
-        results.push({ role: isUser ? 'user' : 'assistant', content });
-      }
+      const built = buildMessageNode(results.length, isUser ? 'user' : 'assistant', node, node);
+      if (built) results.push(built);
     }
     return results;
+  },
+
+  extractMessages(): ChatMessage[] {
+    return toPlainMessages(this.extractMessageNodes());
   },
 
   getConversationTitle(): string {

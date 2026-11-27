@@ -12,6 +12,22 @@ export interface ChatMessage {
   thinking?: string;
 }
 
+export interface ExtractedMessageNode extends ChatMessage {
+  index: number;
+  element: HTMLElement | null;
+}
+
+export interface TimelineNode {
+  index: number;
+  role: MessageRole;
+  preview: string;
+  hasCode: boolean;
+  hasMath: boolean;
+  hasTable: boolean;
+  muted: boolean;
+  element: HTMLElement | null;
+}
+
 export interface PromptTemplate {
   id: string;
   command: string;
@@ -32,11 +48,66 @@ export interface HandoffPayload {
   messageCount: number;
   includedCount: number;
   redactedCount: number;
+  isFork?: boolean;
   createdAt: number;
   expiresAt: number;
   mode: HandoffMode;
   promptText: string;
   estimatedTokens: number;
+}
+
+export type TabRunState = 'idle' | 'streaming' | 'done';
+
+export interface TabStatusEntry {
+  tabId: string;
+  platform: PlatformId;
+  title: string;
+  state: TabRunState;
+  startedAt: number;
+  updatedAt: number;
+  expiresAt: number;
+  lastDurationSec?: number;
+  lastPreview: string;
+}
+
+export interface BroadcastCommand {
+  id: string;
+  targetTabIds: string[];
+  promptText: string;
+  autoSubmit: boolean;
+  createdAt: number;
+  consumedBy: string[];
+}
+
+export interface PinnedSnippet {
+  id: string;
+  sourcePlatform: PlatformId;
+  sourceTitle: string;
+  sourceFingerprint: string;
+  text: string;
+  kind: 'selection' | 'turn';
+  createdAt: number;
+}
+
+export type VerifyKind = 'npm' | 'pypi' | 'github' | 'url';
+
+export interface VerifyCandidate {
+  kind: VerifyKind;
+  target: string;
+  displayLabel: string;
+}
+
+export interface VerifyResult extends VerifyCandidate {
+  status: 'valid' | 'not_found' | 'suspicious' | 'error';
+  detail: string;
+  version?: string;
+  stars?: number;
+}
+
+export interface HttpGetResponse {
+  ok: boolean;
+  status: number;
+  body: string;
 }
 
 export interface RelaySettings {
@@ -52,9 +123,19 @@ export interface RelaySettings {
   handoffTtlMinutes: number;
   includeSourceUrlInExport: boolean;
   autoCopyToClipboard: boolean;
+  showTimeline: boolean;
+  showDynamicIsland: boolean;
+  notifyOnBackgroundDone: boolean;
+  selectionPinbar: boolean;
 }
 
-export type StorageKey = 'templates' | 'handoff' | 'settings';
+export type StorageKey =
+  | 'templates'
+  | 'handoff'
+  | 'settings'
+  | 'pins'
+  | 'tab_statuses'
+  | 'broadcast';
 
 export interface StorageBridge {
   get<T>(key: StorageKey): Promise<T | null>;
@@ -62,4 +143,5 @@ export interface StorageBridge {
   remove(key: StorageKey): Promise<void>;
   subscribe(listener: (key: StorageKey) => void): () => void;
   copyToClipboard(text: string): Promise<boolean>;
+  fetchPublicReadOnly?(url: string): Promise<HttpGetResponse>;
 }
